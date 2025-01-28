@@ -7,7 +7,7 @@ from django.contrib.auth import authenticate
 from .models import User, Team, TeamMembership, Task
 from .serializers import UserSerializer, TeamSerializer, TeamMembershipSerializer, TaskSerializer
 from .permissions import IsScrumMaster, IsScrumMasterOrAdmin, IsAdminOrAssignee, IsScrumMasterOrAdminTeam
-
+from .utils.slack import SlackNotifier
 
 # User Signup View
 class UserListCreateView(generics.ListCreateAPIView):
@@ -147,3 +147,29 @@ class TaskDetailView(APIView):
         task.status = request.data['status']
         task.save()
         return Response(TaskSerializer(task).data, status=200)
+
+class TriggerNotificationView(APIView):
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        user_id = request.data.get("user_id")
+        message = request.data.get("message", "No message provided.")
+
+        # Fetch user details (optional)
+        try:
+            user = User.objects.get(id=user_id)
+            user_info = f"User: {user.username} (ID: {user.id})"
+        except User.DoesNotExist:
+            user_info = f"User with ID {user_id} does not exist."
+
+        # Send notification to the app
+        full_message = f"{message}\n{user_info}"
+        print(f"Notification triggered: {full_message}")
+
+        # Send notification to Slack
+        slack_notifier = SlackNotifier()
+        slack_response = slack_notifier.send_message(full_message)
+
+        if slack_response:
+            return Response({"message": "Notification triggered and sent to Slack successfully."}, status=200)
+        return Response({"message": "Notification triggered but failed to send to Slack."}, status=500)

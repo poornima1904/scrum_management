@@ -54,3 +54,9 @@ class Task(models.Model):
         User, on_delete=models.CASCADE, related_name='assigned_tasks', null=True, blank=True
     )
     status = models.CharField(max_length=20, choices=STATUS_CHOICES, default='To Do')
+
+class Notification(models.Model):
+    user = models.ForeignKey(User, on_delete=models.CASCADE, related_name='notifications')
+    message = models.TextField()
+    read = models.BooleanField(default=False)
+    created_at = models.DateTimeField(auto_now_add=True)
