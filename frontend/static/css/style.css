@@ -1,0 +1,152 @@
+body {
+    font-family: Arial, sans-serif;
+    margin: 0;
+    padding: 0;
+}
+
+header {
+    background-color: #333;
+    color: #fff;
+    padding: 10px;
+    text-align: center;
+    position: relative;
+}
+
+.dropdown {
+    position: absolute;
+    top: 50%;
+    left: 15px;
+    transform: translateY(-50%);
+}
+
+.dropdown-button {
+    width: 40px;
+    height: 40px;
+    background-color: #ccc; /* Grey color for the button */
+    border: none;
+    border-radius: 0; /* Square button */
+    cursor: pointer;
+    position: relative; /* Position for the dropdown arrow */
+}
+
+.dropdown-button::after {
+    content: '▼'; /* Unicode for a downward arrow */
+    font-size: 12px;
+    color: #333;
+    position: absolute;
+    top: 50%;
+    right: 10px;
+    transform: translateY(-50%);
+    pointer-events: none; /* Prevent interaction with the arrow */
+}
+
+.dropdown-button:hover {
+    background-color: #aaa; /* Darker grey when hovered */
+}
+
+.dropdown-content {
+    display: none;
+    position: absolute;
+    top: 50px;
+    left: 0;
+    background-color: white;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+    z-index: 1000;
+    border-radius: 5px;
+    overflow: hidden;
+}
+
+.dropdown-content.show {
+    display: block;
+}
+
+.dropdown-content a {
+    display: block;
+    padding: 10px 15px;
+    text-decoration: none;
+    color: #333;
+    font-size: 14px;
+    border-bottom: 1px solid #ddd;
+}
+
+.dropdown-content a:hover {
+    background-color: #f4f4f4;
+}
+
+/* Other existing styles */
+.container {
+    display: flex;
+}
+
+main {
+    flex-grow: 1;
+    padding: 20px;
+    text-align: center;
+}
+
+footer {
+    text-align: center;
+    padding: 10px;
+    background-color: #f4f4f4;
+    border-top: 1px solid #ccc;
+    position: fixed;
+    bottom: 0;
+    width: 100%;
+}
+
+/* Form Box Styling */
+.auth-box {
+    width: 400px;
+    margin: 50px auto;
+    padding: 30px;
+    border: 1px solid #ddd;
+    border-radius: 8px;
+    background-color: #f9f9f9;
+    box-shadow: 0px 4px 6px rgba(0, 0, 0, 0.1);
+}
+
+.auth-box h2 {
+    margin-bottom: 20px;
+    font-size: 1.5em;
+    color: #333;
+    text-align: center;
+}
+
+.auth-box form {
+    display: flex;
+    flex-direction: column;
+    gap: 15px;
+    padding: 0 20px; /* Add horizontal padding for equal spacing */
+    box-sizing: border-box; /* Ensure padding does not affect width */
+}
+
+.auth-box label {
+    font-weight: bold;
+    color: #555;
+}
+
+.auth-box input {
+    width: 100%;
+    padding: 10px;
+    border: 1px solid #ccc;
+    border-radius: 5px;
+    font-size: 14px;
+    box-sizing: border-box; /* Ensure padding does not affect input width */
+}
+
+/* Smaller Button Styling */
+.auth-box button {
+    width: 80%; /* Reduced size */
+    margin: 0 auto; /* Center align */
+    padding: 10px; /* Smaller padding */
+    background-color: #007bff;
+    color: white;
+    border: none;
+    border-radius: 5px;
+    font-size: 14px; /* Reduced font size */
+    cursor: pointer;
+}
+
+.auth-box button:hover {
+    background-color: #0056b3;
+}

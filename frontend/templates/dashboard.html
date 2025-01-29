@@ -1,0 +1,13 @@
+{% extends 'base.html' %}
+
+{% block title %}Dashboard{% endblock %}
+
+{% block content %}
+<div class="dashboard-options">
+    <h2>Dashboard Options</h2>
+    <ul>
+        <li><a href="{% url 'manage_teams' %}">Manage Teams</a></li>
+        <li><a href="{% url 'manage_tasks' %}">Manage Tasks</a></li>
+    </ul>
+</div>
+{% endblock %}

@@ -1,0 +1,43 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Scrum Management System</title>
+    <link rel="stylesheet" href="/static/css/style.css">
+</head>
+<body>
+    <header>
+        <div class="dropdown">
+            <button class="dropdown-button" id="dropdownButton"></button>
+            <div class="dropdown-content" id="dropdownContent">
+                <a href="{% url 'dashboard' %}">Dashboard</a>
+                <a href="{% url 'login' %}">Login</a>
+                <a href="{% url 'signup' %}">Sign Up</a>
+            </div>
+        </div>
+        <h1 class="site-title">Scrum Management System</h1>
+    </header>
+
+    <div class="container">
+        {% block content %}
+        {% endblock %}
+    </div>
+
+    <!-- JavaScript to toggle dropdown -->
+    <script>
+        const dropdownButton = document.getElementById('dropdownButton');
+        const dropdownContent = document.getElementById('dropdownContent');
+
+        dropdownButton.addEventListener('click', function (e) {
+            e.stopPropagation(); // Prevent click from propagating
+            dropdownContent.classList.toggle('show');
+        });
+
+        // Close the dropdown if clicked outside
+        document.addEventListener('click', function () {
+            dropdownContent.classList.remove('show');
+        });
+    </script>
+</body>
+</html>

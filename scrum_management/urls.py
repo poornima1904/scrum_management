@@ -11,4 +11,5 @@ urlpatterns = [
     path('api/token/blacklist/', TokenBlacklistView.as_view(), name='token_blacklist'),  # Logout
     path('api/token/verify/', TokenVerifyView.as_view(), name='token_verify'),
     path('notifications/trigger/', TriggerNotificationView.as_view(), name='trigger-notification'),  # Notifications API
+    path('', include('frontend.urls')),
 ]
