@@ -12,25 +12,34 @@ header {
     position: relative;
 }
 
-.dropdown {
+.dropdown,
+.notification {
     position: absolute;
     top: 50%;
-    left: 15px;
     transform: translateY(-50%);
 }
 
-.dropdown-button {
+.dropdown {
+    left: 15px;
+}
+
+.notification {
+    right: 15px;
+}
+
+.dropdown-button,
+.notification-button {
     width: 40px;
     height: 40px;
     background-color: #ccc; /* Grey color for the button */
     border: none;
     border-radius: 0; /* Square button */
     cursor: pointer;
-    position: relative; /* Position for the dropdown arrow */
+    position: relative;
 }
 
 .dropdown-button::after {
-    content: '▼'; /* Unicode for a downward arrow */
+    content: '▼'; /* Unicode for a downward arrow for dropdown */
     font-size: 12px;
     color: #333;
     position: absolute;
@@ -40,7 +49,19 @@ header {
     pointer-events: none; /* Prevent interaction with the arrow */
 }
 
-.dropdown-button:hover {
+.notification-button::after {
+    content: '\1F514'; /* Unicode for bell icon */
+    font-size: 20px; /* Adjust size of the bell icon */
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    color: black; /* Ensure the bell icon is black */
+    pointer-events: none; /* Prevent interaction with the bell icon */
+}
+
+.dropdown-button:hover,
+.notification-button:hover {
     background-color: #aaa; /* Darker grey when hovered */
 }
 
@@ -73,28 +94,15 @@ header {
     background-color: #f4f4f4;
 }
 
-/* Other existing styles */
 .container {
     display: flex;
-}
-
-main {
-    flex-grow: 1;
+    justify-content: center;
+    align-items: center;
+    min-height: calc(100vh - 60px);
     padding: 20px;
-    text-align: center;
+    box-sizing: border-box;
 }
 
-footer {
-    text-align: center;
-    padding: 10px;
-    background-color: #f4f4f4;
-    border-top: 1px solid #ccc;
-    position: fixed;
-    bottom: 0;
-    width: 100%;
-}
-
-/* Form Box Styling */
 .auth-box {
     width: 400px;
     margin: 50px auto;
@@ -116,8 +124,8 @@ footer {
     display: flex;
     flex-direction: column;
     gap: 15px;
-    padding: 0 20px; /* Add horizontal padding for equal spacing */
-    box-sizing: border-box; /* Ensure padding does not affect width */
+    padding: 0 20px;
+    box-sizing: border-box;
 }
 
 .auth-box label {
@@ -131,19 +139,18 @@ footer {
     border: 1px solid #ccc;
     border-radius: 5px;
     font-size: 14px;
-    box-sizing: border-box; /* Ensure padding does not affect input width */
+    box-sizing: border-box;
 }
 
-/* Smaller Button Styling */
 .auth-box button {
-    width: 80%; /* Reduced size */
-    margin: 0 auto; /* Center align */
-    padding: 10px; /* Smaller padding */
+    width: 80%;
+    margin: 0 auto;
+    padding: 10px;
     background-color: #007bff;
     color: white;
     border: none;
     border-radius: 5px;
-    font-size: 14px; /* Reduced font size */
+    font-size: 14px;
     cursor: pointer;
 }
 

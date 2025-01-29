@@ -8,6 +8,7 @@
 </head>
 <body>
     <header>
+        <!-- Dropdown Button -->
         <div class="dropdown">
             <button class="dropdown-button" id="dropdownButton"></button>
             <div class="dropdown-content" id="dropdownContent">
@@ -16,7 +17,14 @@
                 <a href="{% url 'signup' %}">Sign Up</a>
             </div>
         </div>
+
+        <!-- Title -->
         <h1 class="site-title">Scrum Management System</h1>
+
+        <!-- Notifications Button -->
+        <div class="notification">
+            <button class="notification-button" id="notificationButton"></button>
+        </div>
     </header>
 
     <div class="container">
@@ -37,6 +45,11 @@
         // Close the dropdown if clicked outside
         document.addEventListener('click', function () {
             dropdownContent.classList.remove('show');
+        });
+
+        const notificationButton = document.getElementById('notificationButton');
+        notificationButton.addEventListener('click', function () {
+            alert("No notifications yet."); // Placeholder for notification functionality
         });
     </script>
 </body>
