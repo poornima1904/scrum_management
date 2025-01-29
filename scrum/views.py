@@ -72,7 +72,7 @@ class TeamListCreateView(generics.ListCreateAPIView):
 
 # Assign Admin Role to Team Members
 class AssignAdminView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsScrumMaster]
+    permission_classes = [permissions.IsAuthenticated, IsScrumMasterOrAdminTeam]
 
     def post(self, request):
         team_id = request.data.get("team_id")
