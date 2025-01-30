@@ -28,34 +28,25 @@ class TeamSerializer(serializers.ModelSerializer):
         fields = ['id', 'name', 'parent_team', 'created_by', 'sub_teams', 'members']
         read_only_fields = ['created_by']
 
+    # def validate(self, data):
+    #     team = data['team']
+    #     user = data['user']
+    #     if TeamMembership.objects.filter(team=team, user=user).exists():
+    #         raise serializers.ValidationError("User is already a member of this team.")
+    #     return data
+
 
 class TeamMembershipSerializer(serializers.ModelSerializer):
     class Meta:
         model = TeamMembership
         fields = ['id', 'user', 'team', 'role']
 
-    # def create(self, validated_data):
-    #     team = validated_data.get("team")
-    #     user = validated_data.get("user")
-    #     role = validated_data.get("role")
-
-    #     # Permission check: Allow Scrum Master or team Admin to add members
-    #     if self.request.user.role == 'Scrum Master':
-    #         # Scrum Master can assign roles in any team
-    #         pass
-    #     elif self.request.user.role == 'Admin':
-    #         if not TeamMembership.objects.filter(team=team, user=self.request.user, role='Admin').exists():
-    #             raise PermissionError("You do not have permission to assign roles in this team.")
-    #     else:
-    #         raise PermissionError("Only Scrum Master or Admins can assign roles.")
-
-    #     # Ensure the user is not already a member
-    #     if TeamMembership.objects.filter(team=team, user=user).exists():
-    #         raise ValueError("User is already a member of this team.")
-        
-    #     teamMembership = TeamMembership(team=team, user=user, role=role)
-    #     teamMembership.save()
-    #     return teamMembership
+    def validate(self, data):
+        team = data['team']
+        user = data['user']
+        if TeamMembership.objects.filter(team=team, user=user).exists():
+            raise serializers.ValidationError("User is already a member of this team.")
+        return data
 
 
 class TaskSerializer(serializers.ModelSerializer):

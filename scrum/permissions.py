@@ -6,40 +6,36 @@ class IsScrumMaster(BasePermission):
     def has_permission(self, request, view):
         return request.user.role == 'Scrum Master'
 
-
-class IsScrumMasterOrAdmin(BasePermission):
+class SubteamPermission(BasePermission):
     def has_permission(self, request, view):
-        return request.user.role in ['Scrum Master', 'Admin']
+        parent_team_id = request.data.get("parent_team_id")
+        try:
+            team = Team.objects.get(id=parent_team_id)
+        except (Team.DoesNotExist):
+            return False
+        if TeamMembership.objects.get(user=request.user, team=team):
+            return True
+        return False
     
 
 class IsScrumMasterOrAdminTeam(BasePermission):
 
     def has_permission(self, request, view):
         team_id = request.data.get("team")
-        user_id = request.data.get("user")
-        # role = request.data.get("role")
-
         team = Team.objects.get(id=team_id)
-        user = User.objects.get(id=user_id)
 
         # Permission check: Allow Scrum Master or team Admin to add members
         if request.user.role == 'Scrum Master':
-            # Scrum Master can assign roles in any team
-            pass
-        elif request.user.role == 'Admin':
-            if not TeamMembership.objects.filter(team=team, user=request.user, role='Admin').exists():
-                return False
-                raise PermissionError("You do not have permission to assign roles in this team.")
-        else:
-            return False
-            raise PermissionError("Only Scrum Master or Admins can assign roles.")
-
-        # Ensure the user is not already a member
-        if TeamMembership.objects.filter(team=team, user=user).exists():
-            raise ValueError("User is already a member of this team.")
-        return True
-
-    
+            return True
+        # Permission check: Allow team Adminn or parent team admin to add members
+        query_team = [team]
+        parent_team = team.parent_team
+        if parent_team is not None:
+            query_team.append(parent_team)
+        team_membership = TeamMembership.objects.filter(user=request.user, role='Admin', team__in=query_team)
+        if len(team_membership) == len(query_team):
+            return True
+        return False
 
 
 class IsAdminOrAssignee(BasePermission):
