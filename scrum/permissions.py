@@ -21,20 +21,18 @@ class SubteamPermission(BasePermission):
 class IsScrumMasterOrAdminTeam(BasePermission):
 
     def has_permission(self, request, view):
-        team_id = request.data.get("team")
-        team = Team.objects.get(id=team_id)
 
-        # Permission check: Allow Scrum Master or team Admin to add members
+        if request.method == 'GET':
+              return True
+
         if request.user.role == 'Scrum Master':
             return True
-        # Permission check: Allow team Adminn or parent team admin to add members
-        query_team = [team]
-        parent_team = team.parent_team
-        if parent_team is not None:
-            query_team.append(parent_team)
-        team_membership = TeamMembership.objects.filter(user=request.user, role='Admin', team__in=query_team)
-        if len(team_membership) == len(query_team):
-            return True
+
+        if request.method == 'POST':
+            team_id = request.data.get("team")
+            team = Team.objects.get(id=team_id) #TODO: Hnadle error here
+            if TeamMembership.objects.filter(user=request.user, role='Admin', team=team):
+                return True
         return False
 
 

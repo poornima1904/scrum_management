@@ -8,15 +8,16 @@ from .views import (
     TeamMembershipListCreateView,
     TaskListCreateView,
     TaskDetailView,
-    TriggerNotificationView
+    TriggerNotificationView,
+    TeamMembershipView
 )
 
 urlpatterns = [
     path('users/', UserListCreateView.as_view(), name='user-list-create'),  # Signup Endpoint
     path('login/', LoginView.as_view(), name='login'),  # Login Endpoint
-    path('teams/', TeamListCreateView.as_view(), name='team-list-create'),  # Create or List Teams
+    path('teams/', TeamMembershipView.as_view(), name='team-list-create'),  # Create or List Teams
     path('sub-teams/', SubTeamCreateView.as_view(), name='sub-team-create'),  # Create Sub-Teams
-    path('team-memberships/', TeamMembershipListCreateView.as_view(), name='team-membership-list-create'),  # Manage Memberships
+    path('team-memberships/', TeamMembershipView.as_view(), name='team-membership-list-create'),  # Manage Memberships
     path('assign-admin/', AssignAdminView.as_view(), name='assign-admin'),  # Assign Admin Role
     path('tasks/', TaskListCreateView.as_view(), name='task-list-create'),  # Create Tasks
     path('tasks/<int:pk>/', TaskDetailView.as_view(), name='task-detail'),  # Update Task Status

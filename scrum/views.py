@@ -122,7 +122,8 @@ class SubTeamCreateView(APIView):
         TeamMembership.objects.create(user=request.user, team=sub_team, role='Admin')
         # create entry for parent team admin as well
         parent_team_user = parent_team.created_by
-        TeamMembership.objects.create(user=parent_team_user, team=sub_team, role='Admin')
+        if parent_team_user != request.user:
+            TeamMembership.objects.create(user=parent_team_user, team=sub_team, role='Admin')
         return Response(TeamSerializer(sub_team).data, status=201)
 
 
@@ -133,20 +134,58 @@ class TeamMembershipListCreateView(generics.ListCreateAPIView):
     permission_classes = [permissions.IsAuthenticated, IsScrumMasterOrAdminTeam]
 
 
-# Task List and Creation View
-class TaskListCreateView(APIView):
-    permission_classes = [permissions.IsAuthenticated]
+class TeamMembershipView(APIView):
+
+    #TODO: arrange code pieces for validation , permission and core logic
+
+    permission_classes = [permissions.IsAuthenticated, IsScrumMasterOrAdminTeam]
+
+    def get(self, request):
+
+        # team_memberships = TeamMembership.objects.filter(user=request.user)
+        teams = Team.objects.filter(teammembership__user=request.user).values_list("name", flat=True)
+        # return Response(TeamMembershipSerializer(team_memberships, many=True).data, status=200)
+        return Response({"teams": teams}, status=200)
 
     def post(self, request):
-        team = Team.objects.get(id=request.data['team_id'])
-        if not TeamMembership.objects.filter(team=team, user=request.user, role='Admin').exists():
-            return Response({'error': 'Only Admins can create tasks'}, status=403)
+
+        team_id = request.data.get('team')
+        user_id = request.data.get('user')
+        role = request.data.get('role')
+    
+        try:
+            team = Team.objects.get(id=team_id)
+            user = User.objects.get(id=user_id)
+        except (Team.DoesNotExist, User.DoesNotExist):
+            return Response({"error": "Invalid team or user"}, status=status.HTTP_400_BAD_REQUEST)
+        
+        if TeamMembership.objects.filter(team=team, user=user).exists():
+            return Response({"User is already a member of this team."}, status=status.HTTP_400_BAD_REQUEST)
+
+        team_membership = TeamMembership.objects.bulk_create(user=user, team=team, role=role)
+        return Response(TeamMembershipSerializer(team_membership).data, status=201)
+
+# Task List and Creation View
+class TaskListCreateView(APIView):
+    permission_classes = [permissions.IsAuthenticated, IsScrumMasterOrAdminTeam]
+
+    def get(self, request):
+
+        status = request.query_params.get("status", "To Do")
+
+        tasks = Task.objects.filter(assigned_to=request.user, status=status).values_list('title', flat=True)
+        return Response({"tasks": tasks}, status=200)
+
+    def post(self, request):
+        team = Team.objects.get(id=request.data['team'])
+        # if not TeamMembership.objects.filter(team=team, user=request.user, role='Admin').exists():
+        #     return Response({'error': 'Only Admins can create tasks'}, status=403)
 
         task = Task.objects.create(
             title=request.data['title'],
             team=team,
             created_by=request.user,
-            assigned_to=User.objects.get(id=request.data['assigned_to_id'])
+            assigned_to=User.objects.get(id=request.data['assigned_to_id']) #TODO: ADD assigned to validations
         )
         return Response(TaskSerializer(task).data, status=201)
 
