@@ -1,5 +1,195 @@
-{% extends 'base.html' %}
+{% extends "base.html" %}
 
 {% block content %}
-<p>Here you can manage your teams efficiently.</p>
+<div class="container">
+    <!-- Section for Create a Team and Create a Sub-Team -->
+    <div class="grid grid-cols-2 gap-4">
+        <div class="auth-box">
+            <h2>Create a Team</h2>
+            <form id="create-team-form">
+                <label for="team-name">Team Name:</label>
+                <input type="text" id="team-name" name="team-name" required>
+                <button type="submit">Create Team</button>
+            </form>
+        </div>
+
+        <div class="auth-box">
+            <h2>Create a Sub-Team</h2>
+            <form id="create-subteam-form">
+                <label for="subteam-name">Sub-Team Name:</label>
+                <input type="text" id="subteam-name" name="subteam-name" required>
+                <label for="parent-team">Select Parent Team:</label>
+                <select id="parent-team" name="parent-team" required>
+                    <!-- Parent teams will be loaded dynamically -->
+                </select>
+                <button type="submit">Create Sub-Team</button>
+            </form>
+        </div>
+    </div>
+
+    <hr>
+
+    <!-- Section for Assign Admin -->
+    <div class="auth-box">
+        <h2>Assign Admin</h2>
+        <form id="assign-admin-form">
+            <label for="team-select">Select Team:</label>
+            <select id="team-select" name="team" required>
+                <!-- Teams will be loaded dynamically -->
+            </select>
+
+            <label for="user-select">Select User:</label>
+            <select id="user-select" name="user" required>
+                <!-- Users will be loaded dynamically -->
+            </select>
+
+            <button type="submit">Assign Admin</button>
+        </form>
+    </div>
+
+    <hr>
+
+    <!-- Section for Manage Team Memberships and Existing Teams -->
+    <div class="grid grid-cols-2 gap-4">
+        <div class="auth-box">
+            <h2>Manage Team Memberships</h2>
+            <button id="manage-memberships-button">Go to Manage Memberships</button>
+        </div>
+
+        <div class="auth-box">
+            <h2>Existing Teams</h2>
+            <ul id="team-list">
+                <!-- Teams will be loaded here dynamically -->
+            </ul>
+        </div>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const teamList = document.getElementById("team-list");
+        const createTeamForm = document.getElementById("create-team-form");
+        const assignAdminForm = document.getElementById("assign-admin-form");
+        const teamSelect = document.getElementById("team-select");
+        const userSelect = document.getElementById("user-select");
+        const parentTeamSelect = document.getElementById("parent-team");
+
+        const API_TEAMS_URL = "/api/teams/";
+        const API_USERS_URL = "/api/users/";
+        const API_ASSIGN_ADMIN_URL = "/api/assign-admin/";
+
+        const token = localStorage.getItem("token"); // Get token from localStorage
+
+        // Fetch and display teams
+        function loadTeams() {
+            fetch(API_TEAMS_URL, {
+                headers: {
+                    "Authorization": `Token ${token}`,
+                },
+            })
+                .then((response) => response.json())
+                .then((data) => {
+                    // Populate team list
+                    teamList.innerHTML = "";
+                    teamSelect.innerHTML = '<option value="">Select a Team</option>'; // Clear and reset dropdown
+                    parentTeamSelect.innerHTML = '<option value="">Select a Parent Team</option>';
+                    data.forEach((team) => {
+                        // List in team section
+                        const li = document.createElement("li");
+                        li.textContent = team.name;
+                        teamList.appendChild(li);
+
+                        // Add to dropdown
+                        const option = document.createElement("option");
+                        option.value = team.id;
+                        option.textContent = team.name;
+                        teamSelect.appendChild(option);
+                        parentTeamSelect.appendChild(option.cloneNode(true));
+                    });
+                })
+                .catch((error) => console.error("Error fetching teams:", error));
+        }
+
+        // Fetch and display users
+        function loadUsers() {
+            fetch(API_USERS_URL, {
+                headers: {
+                    "Authorization": `Token ${token}`,
+                },
+            })
+                .then((response) => response.json())
+                .then((data) => {
+                    userSelect.innerHTML = '<option value="">Select a User</option>'; // Clear and reset dropdown
+                    data.forEach((user) => {
+                        const option = document.createElement("option");
+                        option.value = user.id;
+                        option.textContent = `${user.username} (${user.role})`;
+                        userSelect.appendChild(option);
+                    });
+                })
+                .catch((error) => console.error("Error fetching users:", error));
+        }
+
+        // Handle team creation
+        createTeamForm.addEventListener("submit", function (e) {
+            e.preventDefault();
+            const teamName = document.getElementById("team-name").value;
+
+            fetch(API_TEAMS_URL, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Token ${token}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ name: teamName }),
+            })
+                .then((response) => {
+                    if (response.ok) {
+                        loadTeams(); // Reload teams after adding
+                        createTeamForm.reset();
+                    } else {
+                        console.error("Error creating team");
+                    }
+                })
+                .catch((error) => console.error("Error:", error));
+        });
+
+        // Handle admin assignment
+        assignAdminForm.addEventListener("submit", function (e) {
+            e.preventDefault();
+
+            const teamId = teamSelect.value;
+            const userId = userSelect.value;
+
+            if (!teamId || !userId) {
+                alert("Please select both a team and a user.");
+                return;
+            }
+
+            fetch(API_ASSIGN_ADMIN_URL, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Token ${token}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ team: teamId, user: userId }),
+            })
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data.message) {
+                        alert(data.message);
+                        loadTeams(); // Optionally reload teams
+                    } else if (data.error) {
+                        alert(`Error: ${data.error}`);
+                    }
+                })
+                .catch((error) => console.error("Error:", error));
+        });
+
+        // Load teams and users on page load
+        loadTeams();
+        loadUsers();
+    });
+</script>
+
 {% endblock %}

@@ -5,15 +5,16 @@
     <h2>Login</h2>
     <form method="POST">
         {% csrf_token %}
-        <div>
-            <label for="username">Username:</label>
-            <input type="text" name="username" id="username" required>
-        </div>
-        <div>
-            <label for="password">Password:</label>
-            <input type="password" name="password" id="password" required>
-        </div>
+        {{ form.as_p }}
         <button type="submit">Login</button>
     </form>
+
+    {% if errors %}
+    <div class="error-messages">
+        <ul>
+            <li>{{ errors }}</li>
+        </ul>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}

@@ -1,0 +1,144 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="container">
+    <!-- Section: Manage Team Memberships -->
+    <div class="auth-box">
+        <h2>Manage Team Memberships</h2>
+        <form id="manage-membership-form">
+            <label for="team-membership-select">Select Team:</label>
+            <select id="team-membership-select" name="team" required>
+                <!-- Teams will be loaded dynamically -->
+            </select>
+
+            <label for="membership-user-select">Select User:</label>
+            <select id="membership-user-select" name="user" required>
+                <!-- Users will be loaded dynamically -->
+            </select>
+
+            <label for="role-select">Select Role:</label>
+            <select id="role-select" name="role" required>
+                <option value="Member">Member</option>
+                <option value="Admin">Admin</option>
+            </select>
+
+            <button type="submit">Add Member</button>
+        </form>
+    </div>
+
+    <div class="auth-box">
+        <h3>Current Memberships</h3>
+        <ul id="membership-list">
+            <!-- Memberships will be loaded here dynamically -->
+        </ul>
+    </div>
+</div>
+
+<script>
+    document.addEventListener("DOMContentLoaded", function () {
+        const membershipList = document.getElementById("membership-list");
+        const manageMembershipForm = document.getElementById("manage-membership-form");
+        const teamMembershipSelect = document.getElementById("team-membership-select");
+        const membershipUserSelect = document.getElementById("membership-user-select");
+
+        const API_TEAMS_URL = "/api/teams/";
+        const API_USERS_URL = "/api/users/";
+        const API_MEMBERSHIP_URL = "/api/team-memberships/";
+
+        const token = localStorage.getItem("token"); // Get token from localStorage
+
+        // Fetch and display teams
+        function loadTeams() {
+            fetch(API_TEAMS_URL, {
+                headers: {
+                    "Authorization": `Token ${token}`,
+                },
+            })
+                .then((response) => response.json())
+                .then((data) => {
+                    teamMembershipSelect.innerHTML = '<option value="">Select a Team</option>'; // Reset dropdown
+                    data.forEach((team) => {
+                        const option = document.createElement("option");
+                        option.value = team.id;
+                        option.textContent = team.name;
+                        teamMembershipSelect.appendChild(option);
+                    });
+                })
+                .catch((error) => console.error("Error fetching teams:", error));
+        }
+
+        // Fetch and display users
+        function loadUsers() {
+            fetch(API_USERS_URL, {
+                headers: {
+                    "Authorization": `Token ${token}`,
+                },
+            })
+                .then((response) => response.json())
+                .then((data) => {
+                    membershipUserSelect.innerHTML = '<option value="">Select a User</option>'; // Reset dropdown
+                    data.forEach((user) => {
+                        const option = document.createElement("option");
+                        option.value = user.id;
+                        option.textContent = `${user.username} (${user.role})`;
+                        membershipUserSelect.appendChild(option);
+                    });
+                })
+                .catch((error) => console.error("Error fetching users:", error));
+        }
+
+        // Handle membership creation
+        manageMembershipForm.addEventListener("submit", function (e) {
+            e.preventDefault();
+
+            const teamId = teamMembershipSelect.value;
+            const userId = membershipUserSelect.value;
+            const role = document.getElementById("role-select").value;
+
+            fetch(API_MEMBERSHIP_URL, {
+                method: "POST",
+                headers: {
+                    "Authorization": `Token ${token}`,
+                    "Content-Type": "application/json",
+                },
+                body: JSON.stringify({ team: teamId, user: userId, role: role }),
+            })
+                .then((response) => response.json())
+                .then((data) => {
+                    if (data.message) {
+                        alert(data.message);
+                        loadMemberships(); // Reload memberships
+                    } else if (data.error) {
+                        alert(`Error: ${data.error}`);
+                    }
+                })
+                .catch((error) => console.error("Error:", error));
+        });
+
+        // Fetch and display memberships
+        function loadMemberships() {
+            fetch(API_MEMBERSHIP_URL, {
+                headers: {
+                    "Authorization": `Token ${token}`,
+                },
+            })
+                .then((response) => response.json())
+                .then((data) => {
+                    membershipList.innerHTML = ""; // Clear list
+                    data.forEach((membership) => {
+                        const li = document.createElement("li");
+                        li.textContent = `User: ${membership.user}, Team: ${membership.team}, Role: ${membership.role}`;
+                        membershipList.appendChild(li);
+                    });
+                })
+                .catch((error) => console.error("Error fetching memberships:", error));
+        }
+
+        // Load teams, users, and memberships on page load
+        loadTeams();
+        loadUsers();
+        loadMemberships();
+    });
+</script>
+
+{% endblock %}

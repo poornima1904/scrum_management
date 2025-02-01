@@ -19,5 +19,15 @@
         </div>
         <button type="submit">Sign Up</button>
     </form>
+
+    {% if errors %}
+    <div class="error-messages">
+        <ul>
+            {% for key, value in errors.items %}
+            <li>{{ key }}: {{ value|join:", " }}</li>
+            {% endfor %}
+        </ul>
+    </div>
+    {% endif %}
 </div>
 {% endblock %}
