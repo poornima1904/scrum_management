@@ -9,7 +9,7 @@
             <form id="create-team-form">
                 <label for="team-name">Team Name:</label>
                 <input type="text" id="team-name" name="team-name" required>
-                <button type="submit">Create Team</button>
+                <button type="submit" class="blue-button">Create Team</button>
             </form>
         </div>
 
@@ -22,7 +22,7 @@
                 <select id="parent-team" name="parent-team" required>
                     <!-- Parent teams will be loaded dynamically -->
                 </select>
-                <button type="submit">Create Sub-Team</button>
+                <button type="submit" class="blue-button">Create Sub-Team</button>
             </form>
         </div>
     </div>
@@ -43,7 +43,7 @@
                 <!-- Users will be loaded dynamically -->
             </select>
 
-            <button type="submit">Assign Admin</button>
+            <button type="submit" class="blue-button">Assign Admin</button>
         </form>
     </div>
 
@@ -53,7 +53,10 @@
     <div class="grid grid-cols-2 gap-4">
         <div class="auth-box">
             <h2>Manage Team Memberships</h2>
-            <button id="manage-memberships-button">Go to Manage Memberships</button>
+            <!-- Updated button for consistent alignment -->
+            <button onclick="window.location.href='{% url 'manage_team_memberships' %}'" class="blue-button">
+                Go to Manage Memberships
+            </button>
         </div>
 
         <div class="auth-box">

@@ -150,3 +150,34 @@ footer {
 .auth-box button:hover {
     background-color: #0056b3;
 }
+
+/* Add this to your CSS file or <style> tag */
+.button {
+    padding: 10px 20px; /* Adjust padding values for equal spacing */
+    font-size: 16px;
+    color: white;
+    background-color: #007bff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    text-align: center;
+    display: inline-block;
+    width: 100%; /* Ensures it spans the section consistently */
+}
+
+/* Update this in your CSS file or add it */
+.blue-button {
+    width: 100%;
+    padding: 10px;
+    font-size: 16px;
+    color: white;
+    background-color: #007bff;
+    border: none;
+    border-radius: 5px;
+    cursor: pointer;
+    text-align: center;
+}
+
+.blue-button:hover {
+    background-color: #0056b3;
+}

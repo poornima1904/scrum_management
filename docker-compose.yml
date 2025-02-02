@@ -1,0 +1,28 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: django_app
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+    environment:
+      - DEBUG=1
+      - DATABASE_URL=postgres://postgres:password@db:5432/scrum_management_db
+    volumes:
+      - .:/app
+    command: python manage.py runserver 0.0.0.0:8000
+
+  db:
+    image: postgres:13
+    container_name: postgres_db
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+      POSTGRES_DB: scrum_management_db
+volumes:
+  postgres_data:

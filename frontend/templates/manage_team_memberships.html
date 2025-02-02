@@ -22,7 +22,7 @@
                 <option value="Admin">Admin</option>
             </select>
 
-            <button type="submit">Add Member</button>
+            <button type="submit" id="add-member-button">Add Member</button>
         </form>
     </div>
 
@@ -32,6 +32,10 @@
             <!-- Memberships will be loaded here dynamically -->
         </ul>
     </div>
+
+    <div class="auth-box">
+        <button id="go-back-button" class="blue-button">Go Back to Team Management</button>
+    </div>
 </div>
 
 <script>
@@ -40,6 +44,8 @@
         const manageMembershipForm = document.getElementById("manage-membership-form");
         const teamMembershipSelect = document.getElementById("team-membership-select");
         const membershipUserSelect = document.getElementById("membership-user-select");
+        const addMemberButton = document.getElementById("add-member-button");
+        const goBackButton = document.getElementById("go-back-button");
 
         const API_TEAMS_URL = "/api/teams/";
         const API_USERS_URL = "/api/users/";
@@ -103,16 +109,18 @@
                 },
                 body: JSON.stringify({ team: teamId, user: userId, role: role }),
             })
-                .then((response) => response.json())
-                .then((data) => {
-                    if (data.message) {
-                        alert(data.message);
+                .then((response) => {
+                    if (response.ok) {
+                        alert("Membership added successfully!");
                         loadMemberships(); // Reload memberships
-                    } else if (data.error) {
-                        alert(`Error: ${data.error}`);
+                        manageMembershipForm.reset(); // Reset the form
+                    } else {
+                        return response.json().then((data) => {
+                            if (data.error) alert(`Error: ${data.error}`);
+                        });
                     }
                 })
-                .catch((error) => console.error("Error:", error));
+                .catch((error) => console.error("Error adding membership:", error));
         });
 
         // Fetch and display memberships
@@ -133,6 +141,11 @@
                 })
                 .catch((error) => console.error("Error fetching memberships:", error));
         }
+
+        // Handle redirection
+        goBackButton.addEventListener("click", function () {
+            window.location.href = "/dashboard/manage-teams/"; // Redirect to manage teams page
+        });
 
         // Load teams, users, and memberships on page load
         loadTeams();
