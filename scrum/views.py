@@ -10,7 +10,7 @@ from .permissions import IsScrumMaster, IsAdminOrAssignee, IsScrumMasterOrAdminT
 from .utils.slack import SlackNotifier
 
 # User Signup View
-class UserListCreateView(generics.ListCreateAPIView):
+class UserListCreateView(generics.CreateAPIView):
     queryset = User.objects.all()
     serializer_class = UserSerializer
     permission_classes = [permissions.AllowAny]  # Allow signup for all users
