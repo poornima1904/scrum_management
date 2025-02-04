@@ -4,6 +4,7 @@ from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
 from django.contrib.auth import authenticate
+from django.db.models import Q
 from django.db import transaction
 from .models import User, Team, TeamMembership, Task
 from .serializers import (
@@ -16,6 +17,7 @@ from .permissions import (
     IsScrumMasterOrAdminTeam, SubteamPermission
 )
 from .utils.slack import SlackNotifier
+from .utils.constants import ADMIN
 
 # User Signup View
 class UserListCreateView(generics.CreateAPIView):
@@ -138,13 +140,13 @@ class TaskViewSet(viewsets.ModelViewSet):
     """
     queryset = Task.objects.all()
     serializer_class = TaskSerializer
-    permission_classes = [permissions.IsAuthenticated, IsScrumMasterOrAdminTeam, IsTeamAdminOrAssigneeOrReadOnly]
+    permission_classes = [permissions.IsAuthenticated, IsTeamAdminOrAssigneeOrReadOnly]
 
     def get_queryset(self):
         user = self.request.user
 
         # Get all teams where the user is an admin
-        admin_team_ids = TeamMembership.objects.filter(user=user, role="admin").values_list("team_id", flat=True)
+        admin_team_ids = TeamMembership.objects.filter(user=user, role=ADMIN).values_list("team_id", flat=True)
 
         # Get all parent teams where the user is an admin (recursively)
         def get_parent_admin_teams(team_ids):
@@ -161,19 +163,14 @@ class TaskViewSet(viewsets.ModelViewSet):
         all_admin_teams = set(admin_team_ids) | parent_admin_teams
 
         # Return tasks belonging to those teams
-        return Task.objects.filter(team_id__in=all_admin_teams)
+        tasks = Task.objects.filter(Q(team_id__in=all_admin_teams) | Q(assigned_to=user))
+        return tasks
 
 
     def perform_create(self, serializer):
         user = self.request.user
-        team = serializer.validated_data['team']
-
-        # Ensure user is a team admin before creating a task
-        if not TeamMembership.objects.filter(user=user, team=team, role='admin').exists():
-            return Response({"error": "Only team admins can assign tasks."}, status=status.HTTP_403_FORBIDDEN)
-
-        serializer.save(created_by=user)
-
+        task = serializer.save(created_by=user)
+        task.save()
 
 class TriggerNotificationView(APIView):
     permission_classes = [permissions.IsAuthenticated]

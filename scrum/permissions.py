@@ -1,6 +1,6 @@
 from rest_framework.permissions import BasePermission
 from .models import TeamMembership, Team, User
-from .utils.constants import SCRUM_MASTER
+from .utils.constants import SCRUM_MASTER, ADMIN
 
 
 class IsScrumMaster(BasePermission):
@@ -29,18 +29,19 @@ class IsScrumMasterOrAdminTeam(BasePermission):
         if request.user.role == SCRUM_MASTER:
             return True
 
-        if request.method == 'POST':
+        if request.method in ['POST', 'PATCH', 'PUT']:
             team_id = request.data.get("team")
-            team = Team.objects.get(id=team_id) #TODO: Hnadle error here
-            if TeamMembership.objects.filter(user=request.user, role='Admin', team=team):
-                return True
+            team = Team.objects.filter(id=team_id).first()
+            if team:
+                if TeamMembership.objects.filter(user=request.user, role=ADMIN, team=team):
+                 return True
         return False
 
 
 class IsAdminOrAssignee(BasePermission):
     def has_object_permission(self, request, view, obj):
         # Only Admin or Assignee can update the task
-        is_admin = TeamMembership.objects.filter(team=obj.team, user=request.user, role='Admin').exists()
+        is_admin = TeamMembership.objects.filter(team=obj.team, user=request.user, role=ADMIN).exists()
         is_assignee = obj.assigned_to == request.user
         return is_admin or is_assignee
 
@@ -72,7 +73,7 @@ class IsTeamAdminOrAssigneeOrReadOnly(BasePermission):
 
         # Allow read-only access for team members
         if request.method in ['GET']:
-            return obj.team.members.filter(id=user.id).exists()
+            return TeamMembership.objects.filter(user=user)
 
         # Assignee can update task status
         if request.method in ['PATCH', 'PUT']:

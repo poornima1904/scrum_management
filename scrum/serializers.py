@@ -15,7 +15,7 @@ def is_team_admin_or_scrum_master(user, team):
     try:
         # Check if the user is an admin for the current team
         membership = TeamMembership.objects.get(user=user, team=team)
-        if membership.role == 'admin':
+        if membership.role == ADMIN:
             return True
 
         # Recursively check if the user is an admin of any parent teams
@@ -57,7 +57,7 @@ class TeamSerializer(serializers.Serializer):
         parent_team = data.get('parent_team', None)
 
         # Only Scrum Master can create parent teams
-        if parent_team is None and user.role != 'scrum_master':
+        if parent_team is None and user.role != SCRUM_MASTER:
             raise serializers.ValidationError("Only Scrum Master can create parent teams.")
 
         # Check if the user is a valid Team Admin for sub-team creation
@@ -151,20 +151,18 @@ class TaskSerializer(serializers.ModelSerializer):
         # Validate that the assigned user exists
         if value and not User.objects.filter(id=value.id).exists():
             raise serializers.ValidationError("Assigned user does not exist.")
-        return value
 
     def validate(self, attrs):
+        assigned_to = attrs.get('assigned_to')
+        assigned_team_task =  attrs.get('team')
+        user_teams = TeamMembership.objects.filter(user_id=assigned_to).values_list("team_id", flat=True)
         # Custom validation for any other business logic
-        if attrs.get('assigned_to') and attrs.get('created_by') == attrs.get('assigned_to'):
+        if assigned_to and attrs.get('created_by') ==assigned_to:
             raise serializers.ValidationError("Assigned user cannot be the same as the creator.")
+         # ensure the user is from the same team
+        if assigned_team_task not in user_teams:
+            raise serializers.ValidationError("Cannot assign task of some other team")
         return attrs
-
-    def validate_assigned_to(self, value):
-        """Ensure that assigned user is part of the team."""
-        team = self.instance.team if self.instance else self.initial_data.get('team')
-        if team and not team.members.filter(id=value.id).exists():
-            raise serializers.ValidationError("Assigned user must be a member of the team.")
-        return value
 
 
 class UpdateTeamMemberRoleSerializer(serializers.Serializer):
