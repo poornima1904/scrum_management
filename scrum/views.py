@@ -1,12 +1,20 @@
-from rest_framework import generics, permissions, status
+from rest_framework import generics, permissions, status, viewsets
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
 from django.contrib.auth import authenticate
+from django.db import transaction
 from .models import User, Team, TeamMembership, Task
-from .serializers import UserSerializer, TeamSerializer, TeamMembershipSerializer, TaskSerializer, UpdateTeamMemberRoleSerializer
-from .permissions import IsScrumMaster, IsAdminOrAssignee, IsScrumMasterOrAdminTeam, SubteamPermission
+from .serializers import (
+    UserSerializer, TeamSerializer,
+    TeamMembershipSerializer, TaskSerializer,
+    UpdateTeamMemberRoleSerializer, AddUserToTeamSerializer
+)
+from .permissions import (
+    IsScrumMaster, IsAdminOrAssignee, IsTeamAdminOrAssigneeOrReadOnly,
+    IsScrumMasterOrAdminTeam, SubteamPermission
+)
 from .utils.slack import SlackNotifier
 
 # User Signup View
@@ -70,27 +78,6 @@ class TeamListCreateView(generics.ListCreateAPIView):
         TeamMembership.objects.create(user=self.request.user, team=team, role='Admin')
 
 
-# Assign Admin Role to Team Members
-class AssignAdminView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsScrumMasterOrAdminTeam]
-
-    def post(self, request):
-
-        team_id = request.data.get("team")
-        user_id = request.data.get("user")
-
-        try:
-            team = Team.objects.get(id=team_id)
-            user = User.objects.get(id=user_id)
-        except (Team.DoesNotExist, User.DoesNotExist):
-            return Response({"error": "Invalid team or user"}, status=status.HTTP_400_BAD_REQUEST)
-
-        membership, created = TeamMembership.objects.get_or_create(user=user, team=team)
-        membership.role = 'Admin'
-        membership.save()
-
-        return Response({"message": f"User {user.username} is now an Admin of {team.name}"}, status=status.HTTP_200_OK)
-
 
 # Team Membership List and Creation View
 class TeamMembershipListCreateView(generics.ListCreateAPIView):
@@ -100,6 +87,27 @@ class TeamMembershipListCreateView(generics.ListCreateAPIView):
 
 
 class TeamMembershipView(APIView):
+
+    def post(self, request, *args, **kwargs):
+        serializer = AddUserToTeamSerializer(data=request.data, context={'request': request})
+        
+        if serializer.is_valid():
+            user = serializer.validated_data['user_id']
+            team = serializer.validated_data['team_id']
+            role = serializer.validated_data['role']
+
+            with transaction.atomic():  # Ensure team membership creation is transactional
+                # Check if the user is already in the team
+                if TeamMembership.objects.filter(user=user, team=team).exists():
+                    return Response({"message": "User is already a member of the team."}, status=status.HTTP_400_BAD_REQUEST)
+                
+                # Create the team membership
+                team_membership = TeamMembership.objects.create(user=user, team=team, role=role)
+                
+            return Response({"message": f"User {user.username} added to team {team.name} with role {role}"},
+                            status=status.HTTP_201_CREATED)
+
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
     def patch(self, request, *args, **kwargs):
         serializer = UpdateTeamMemberRoleSerializer(data=request.data, context={'request': request})
@@ -120,41 +128,52 @@ class TeamMembershipView(APIView):
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 # Task List and Creation View
-class TaskListCreateView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsScrumMasterOrAdminTeam]
+class TaskViewSet(viewsets.ModelViewSet):
 
-    def get(self, request):
+    """
+    API for managing tasks.
+    - Team admins & parent team admins can assign/view tasks.
+    - Assignee & team admins can update status.
+    - Team members can view team tasks.
+    """
+    queryset = Task.objects.all()
+    serializer_class = TaskSerializer
+    permission_classes = [permissions.IsAuthenticated, IsScrumMasterOrAdminTeam, IsTeamAdminOrAssigneeOrReadOnly]
 
-        status = request.query_params.get("status", "To Do")
+    def get_queryset(self):
+        user = self.request.user
 
-        tasks = Task.objects.filter(assigned_to=request.user, status=status).values_list('title', flat=True)
-        return Response({"tasks": tasks}, status=200)
+        # Get all teams where the user is an admin
+        admin_team_ids = TeamMembership.objects.filter(user=user, role="admin").values_list("team_id", flat=True)
 
-    def post(self, request):
-        team = Team.objects.get(id=request.data['team'])
-        # if not TeamMembership.objects.filter(team=team, user=request.user, role='Admin').exists():
-        #     return Response({'error': 'Only Admins can create tasks'}, status=403)
+        # Get all parent teams where the user is an admin (recursively)
+        def get_parent_admin_teams(team_ids):
+            parent_team_ids = Team.objects.filter(id__in=team_ids).values_list("parent_team_id", flat=True)
+            parent_team_ids = [t for t in parent_team_ids if t is not None]  # Remove None values
+            if not parent_team_ids:
+                return set()
+            return set(parent_team_ids) | get_parent_admin_teams(parent_team_ids)
 
-        task = Task.objects.create(
-            title=request.data['title'],
-            team=team,
-            created_by=request.user,
-            assigned_to=User.objects.get(id=request.data['assigned_to_id']) #TODO: ADD assigned to validations
-        )
-        return Response(TaskSerializer(task).data, status=201)
+        # Find all parent teams where the user is an admin
+        parent_admin_teams = get_parent_admin_teams(admin_team_ids)
+
+        # Combine direct admin teams + parent admin teams
+        all_admin_teams = set(admin_team_ids) | parent_admin_teams
+
+        # Return tasks belonging to those teams
+        return Task.objects.filter(team_id__in=all_admin_teams)
 
 
-# Task Detail View (Update Task Status)
-class TaskDetailView(APIView):
-    permission_classes = [permissions.IsAuthenticated, IsAdminOrAssignee]
+    def perform_create(self, serializer):
+        user = self.request.user
+        team = serializer.validated_data['team']
 
-    def patch(self, request, pk):
-        task = Task.objects.get(id=pk)
-        self.check_object_permissions(request, task)
+        # Ensure user is a team admin before creating a task
+        if not TeamMembership.objects.filter(user=user, team=team, role='admin').exists():
+            return Response({"error": "Only team admins can assign tasks."}, status=status.HTTP_403_FORBIDDEN)
 
-        task.status = request.data['status']
-        task.save()
-        return Response(TaskSerializer(task).data, status=200)
+        serializer.save(created_by=user)
+
 
 class TriggerNotificationView(APIView):
     permission_classes = [permissions.IsAuthenticated]
@@ -190,9 +209,58 @@ class TeamAPIView(APIView):
         serializer = TeamSerializer(teams, many=True)
         return Response(serializer.data)
 
-    def post(self, request, format=None):
+    def post(self, request, *args, **kwargs):
         serializer = TeamSerializer(data=request.data, context={'request': request})
+
         if serializer.is_valid():
-            team = serializer.save()  # Save the new team
-            return Response(TeamSerializer(team).data, status=status.HTTP_201_CREATED)
+            user = request.user
+            name = serializer.validated_data['name']
+            parent_team = serializer.validated_data.get('parent_team', None)
+
+            with transaction.atomic():  # Ensure team creation and membership assignment are transactional
+                # Create the team
+                team = Team.objects.create(name=name, parent_team=parent_team, created_by=user)
+
+                # Assign the creator as the team admin
+                TeamMembership.objects.create(user=user, team=team, role='admin')
+
+            return Response({"message": f"Team '{team.name}' created successfully."}, 
+                            status=status.HTTP_201_CREATED)
+
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
+
+class UserTeamsView(APIView):
+    """
+    API to get the list of teams the authenticated user is a part of.
+    Only accessible by Scrum Masters or Team Admins.
+    Supports fetching sub-teams if `include_subteams=true` is provided.
+    """
+
+    permission_classes = [IsScrumMasterOrAdminTeam]  # Apply custom permission
+
+    def get(self, request, *args, **kwargs):
+        user = request.user
+        include_subteams = request.query_params.get('include_subteams', 'false').lower() == 'true'
+
+        # Fetch teams where the user has a membership
+        user_team_ids = TeamMembership.objects.filter(user=user).values_list('team_id', flat=True)
+        user_teams = Team.objects.filter(id__in=user_team_ids)
+
+        if include_subteams:
+            all_teams = set()  
+            for team in user_teams:
+                all_teams.update(self.get_all_teams_with_subteams(team))
+            user_teams = list(all_teams)
+
+        serializer = TeamSerializer(user_teams, many=True)
+        return Response(serializer.data, status=status.HTTP_200_OK)
+
+    def get_all_teams_with_subteams(self, team):
+        """
+        Recursively fetch all sub-teams for a given team.
+        """
+        teams = [team]  # Include the given team
+        for sub_team in team.sub_teams.all():
+            teams.extend(self.get_all_teams_with_subteams(sub_team))
+        return teams

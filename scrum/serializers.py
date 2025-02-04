@@ -1,7 +1,30 @@
 from django.db import IntegrityError, transaction
 from rest_framework import serializers
 from .models import TeamMembership, User, Team, Task
-from .utils.constants import SCRUM_MASTER
+from .utils.constants import SCRUM_MASTER, ADMIN
+
+
+def is_team_admin_or_scrum_master(user, team):
+    """
+    Check if the user is a team admin for the given team (or any of its parent teams) 
+    or if the user is a Scrum Master.
+    """
+    if user.role == SCRUM_MASTER:  # Scrum Master has full access
+        return True
+
+    try:
+        # Check if the user is an admin for the current team
+        membership = TeamMembership.objects.get(user=user, team=team)
+        if membership.role == 'admin':
+            return True
+
+        # Recursively check if the user is an admin of any parent teams
+        if team.parent_team:
+            return is_team_admin_or_scrum_master(user, team.parent_team)
+
+        return False
+    except TeamMembership.DoesNotExist:
+        return False
 
 
 class UserSerializer(serializers.ModelSerializer):
@@ -29,26 +52,29 @@ class TeamSerializer(serializers.Serializer):
     created_by = serializers.PrimaryKeyRelatedField(queryset=User.objects.all(), required=False)
 
     # Custom validation for parent_team (only Scrum Master can create parent teams)
-    def validate_parent_team(self, value):
-        user = self.context['request'].user  # Get the logged-in user
-        
-        if value is None:
-            # If no parent team, only Scrum Master can create parent team
-            if user.role != 'Scrum Master':
-                raise serializers.ValidationError("Only the Scrum Master can create parent teams.")
-        
-        else:
-            # Check if user is admin of the parent team or any of its ancestors
-            if not self.is_user_team_admin(user, value):
-                raise serializers.ValidationError("You must be an admin of the parent team to create a sub-team.")
+    def validate(self, data):
+        user = self.context['request'].user
+        parent_team = data.get('parent_team', None)
 
-        return value
+        # Only Scrum Master can create parent teams
+        if parent_team is None and user.role != 'scrum_master':
+            raise serializers.ValidationError("Only Scrum Master can create parent teams.")
+
+        # Check if the user is a valid Team Admin for sub-team creation
+        if parent_team and not is_team_admin_or_scrum_master(user, parent_team):
+            raise serializers.ValidationError("Only Team Admins or Scrum Masters can create sub-teams.")
+
+        # Ensure team name is unique
+        if Team.objects.filter(name=data['name']).exists():
+            raise serializers.ValidationError("A team with this name already exists.")
+
+        return data
 
     def is_user_team_admin(self, user, team):
         # Check if user is an admin of the team
         try:
             membership = TeamMembership.objects.get(user=user, team=team)
-            if membership.role == 'admin':
+            if membership.role == ADMIN:
                 return True
         except TeamMembership.DoesNotExist:
             return False
@@ -110,6 +136,35 @@ class TaskSerializer(serializers.ModelSerializer):
     class Meta:
         model = Task
         fields = ['id', 'title', 'team', 'created_by', 'assigned_to', 'status']
+        read_only_fields = ['id', 'created_by']  # Prevent users from modifying these fields
+
+    def validate_team(self, value):
+
+        if not value:
+            raise serializers.ValidationError("Team id is required")
+        # Validate that the team exists
+        if not Team.objects.filter(id=value.id).exists():
+            raise serializers.ValidationError("Invalid team ID.")
+        return value
+
+    def validate_assigned_to(self, value):
+        # Validate that the assigned user exists
+        if value and not User.objects.filter(id=value.id).exists():
+            raise serializers.ValidationError("Assigned user does not exist.")
+        return value
+
+    def validate(self, attrs):
+        # Custom validation for any other business logic
+        if attrs.get('assigned_to') and attrs.get('created_by') == attrs.get('assigned_to'):
+            raise serializers.ValidationError("Assigned user cannot be the same as the creator.")
+        return attrs
+
+    def validate_assigned_to(self, value):
+        """Ensure that assigned user is part of the team."""
+        team = self.instance.team if self.instance else self.initial_data.get('team')
+        if team and not team.members.filter(id=value.id).exists():
+            raise serializers.ValidationError("Assigned user must be a member of the team.")
+        return value
 
 
 class UpdateTeamMemberRoleSerializer(serializers.Serializer):
@@ -134,4 +189,24 @@ class UpdateTeamMemberRoleSerializer(serializers.Serializer):
         if team_membership.role == data['role']:
             raise serializers.ValidationError("User already has this role.")
         
+        return data
+
+
+class AddUserToTeamSerializer(serializers.Serializer):
+    user_id = serializers.PrimaryKeyRelatedField(queryset=User.objects.all())
+    team_id = serializers.PrimaryKeyRelatedField(queryset=Team.objects.all())
+    role = serializers.ChoiceField(choices=TeamMembership.ROLE_CHOICES, default='member')  # Default role is "member"
+    
+    def validate(self, data):
+        request_user = self.context['request'].user
+        target_team = data['team_id']
+
+        # Allow Scrum Masters to add users to any team
+        if request_user.role != SCRUM_MASTER and not is_team_admin_or_scrum_master(request_user, target_team):
+            raise serializers.ValidationError("Only Scrum Master or Team Admin can add users to a team.")
+
+        # Ensure that the user being added is not already a member of the team
+        if TeamMembership.objects.filter(user=data['user_id'], team=target_team).exists():
+            raise serializers.ValidationError("User is already a member of this team.")
+
         return data
