@@ -76,8 +76,8 @@ DATABASES = {
         'NAME': 'scrum_management_db',
         'USER': 'postgres',
         'PASSWORD': '1234',
-        'HOST': 'db',
-        'PORT': '5432',
+        'HOST': 'localhost',
+        'PORT': '5433',
     }
 }
 AUTH_PASSWORD_VALIDATORS = [

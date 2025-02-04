@@ -5,7 +5,7 @@ from rest_framework.authtoken.models import Token
 from rest_framework.authtoken.views import ObtainAuthToken
 from django.contrib.auth import authenticate
 from .models import User, Team, TeamMembership, Task
-from .serializers import UserSerializer, TeamSerializer, TeamMembershipSerializer, TaskSerializer
+from .serializers import UserSerializer, TeamSerializer, TeamMembershipSerializer, TaskSerializer, UpdateTeamMemberRoleSerializer
 from .permissions import IsScrumMaster, IsAdminOrAssignee, IsScrumMasterOrAdminTeam, SubteamPermission
 from .utils.slack import SlackNotifier
 
@@ -92,41 +92,6 @@ class AssignAdminView(APIView):
         return Response({"message": f"User {user.username} is now an Admin of {team.name}"}, status=status.HTTP_200_OK)
 
 
-# Sub-Team Creation View
-class SubTeamCreateView(APIView):
-
-    # def has_permission(self, request, view):
-    #     return [permissions.IsAuthenticated, SubteamPermission]
-
-    # TODO: Add validations
-
-    def post(self, request):
-        
-        # serializer = TeamSerializer(data=request.data)
-        # if not serializer.is_valid():
-        #     return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
-        # parent_team = Team.objects.get(id=request.data['parent_team_id'])
-        parent_team_id = request.data.get("parent_team_id")
-        try:
-            parent_team = Team.objects.get(id=parent_team_id)
-        except (Team.DoesNotExist):
-            return Response({"error": "Invalid team"}, status=status.HTTP_400_BAD_REQUEST)
-        if not TeamMembership.objects.filter(team=parent_team, user=request.user, role='Admin').exists():
-            return Response({'error': 'Only Admins can create sub-teams'}, status=403)
-
-        sub_team = Team.objects.create(
-            name=request.data['name'],
-            parent_team=parent_team,
-            created_by=request.user
-        )
-        TeamMembership.objects.create(user=request.user, team=sub_team, role='Admin')
-        # create entry for parent team admin as well
-        parent_team_user = parent_team.created_by
-        if parent_team_user != request.user:
-            TeamMembership.objects.create(user=parent_team_user, team=sub_team, role='Admin')
-        return Response(TeamSerializer(sub_team).data, status=201)
-
-
 # Team Membership List and Creation View
 class TeamMembershipListCreateView(generics.ListCreateAPIView):
     queryset = TeamMembership.objects.all()
@@ -135,35 +100,24 @@ class TeamMembershipListCreateView(generics.ListCreateAPIView):
 
 
 class TeamMembershipView(APIView):
-
-    #TODO: arrange code pieces for validation , permission and core logic
-
-    permission_classes = [permissions.IsAuthenticated, IsScrumMasterOrAdminTeam]
-
-    def get(self, request):
-
-        # team_memberships = TeamMembership.objects.filter(user=request.user)
-        teams = Team.objects.filter(teammembership__user=request.user).values_list("name", flat=True)
-        # return Response(TeamMembershipSerializer(team_memberships, many=True).data, status=200)
-        return Response({"teams": teams}, status=200)
-
-    def post(self, request):
-
-        team_id = request.data.get('team')
-        user_id = request.data.get('user')
-        role = request.data.get('role')
     
-        try:
-            team = Team.objects.get(id=team_id)
-            user = User.objects.get(id=user_id)
-        except (Team.DoesNotExist, User.DoesNotExist):
-            return Response({"error": "Invalid team or user"}, status=status.HTTP_400_BAD_REQUEST)
+    def patch(self, request, *args, **kwargs):
+        serializer = UpdateTeamMemberRoleSerializer(data=request.data, context={'request': request})
         
-        if TeamMembership.objects.filter(team=team, user=user).exists():
-            return Response({"User is already a member of this team."}, status=status.HTTP_400_BAD_REQUEST)
-
-        team_membership = TeamMembership.objects.bulk_create(user=user, team=team, role=role)
-        return Response(TeamMembershipSerializer(team_membership).data, status=201)
+        if serializer.is_valid():
+            # Extract user, team, and role data
+            user = serializer.validated_data['user_id']
+            team = serializer.validated_data['team_id']
+            new_role = serializer.validated_data['role']
+            
+            # Update the role of the team member
+            team_membership = TeamMembership.objects.get(user=user, team=team)
+            team_membership.role = new_role
+            team_membership.save()
+            
+            return Response({"message": f"User role updated to {new_role}"}, status=status.HTTP_200_OK)
+        
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
 
 # Task List and Creation View
 class TaskListCreateView(APIView):
@@ -227,3 +181,18 @@ class TriggerNotificationView(APIView):
         if slack_response:
             return Response({"message": "Notification triggered and sent to Slack successfully."}, status=200)
         return Response({"message": "Notification triggered but failed to send to Slack."}, status=500)
+
+
+class TeamAPIView(APIView):
+
+    def get(self, request, format=None):
+        teams = Team.objects.all()  # Fetch all teams
+        serializer = TeamSerializer(teams, many=True)
+        return Response(serializer.data)
+
+    def post(self, request, format=None):
+        serializer = TeamSerializer(data=request.data, context={'request': request})
+        if serializer.is_valid():
+            team = serializer.save()  # Save the new team
+            return Response(TeamSerializer(team).data, status=status.HTTP_201_CREATED)
+        return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
