@@ -4,7 +4,7 @@ from .views import (
     UserListCreateView,
     LoginView,
     TaskViewSet,
-    TriggerNotificationView,
+    # TriggerNotificationView,
     TeamMembershipView,
     TeamAPIView,
     UserTeamsView
@@ -19,5 +19,5 @@ urlpatterns = [
     path('team-membership', TeamMembershipView.as_view(), name='team-membership-list-create'),  # Manage Memberships
     path('user/teams', UserTeamsView.as_view(), name='team-membership-list-create'),  # Manage Memberships
     path('', include(router.urls)),
-    path('notifications/trigger/', TriggerNotificationView.as_view(), name='trigger-notification'),
+    # path('notifications/trigger/', TriggerNotificationView.as_view(), name='trigger-notification'),
 ]

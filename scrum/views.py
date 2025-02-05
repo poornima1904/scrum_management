@@ -164,7 +164,6 @@ class TeamMembershipView(APIView):
 
 # Task List and Creation View
 class TaskViewSet(viewsets.ModelViewSet):
-
     """
     API for managing tasks.
     - Team admins & parent team admins can assign/view tasks.
@@ -179,7 +178,7 @@ class TaskViewSet(viewsets.ModelViewSet):
         user = self.request.user
 
         # Get all teams where the user is an admin
-        admin_team_ids = TeamMembership.objects.filter(user=user, role=ADMIN).values_list("team_id", flat=True)
+        admin_team_ids = TeamMembership.objects.filter(user=user, role='Admin').values_list("team_id", flat=True)
 
         # Get all parent teams where the user is an admin (recursively)
         def get_parent_admin_teams(team_ids):
@@ -199,11 +198,40 @@ class TaskViewSet(viewsets.ModelViewSet):
         tasks = Task.objects.filter(Q(team_id__in=all_admin_teams) | Q(assigned_to=user))
         return tasks
 
-
     def perform_create(self, serializer):
         user = self.request.user
         task = serializer.save(created_by=user)
         task.save()
+
+        # Send Slack Notification when a new task is created
+        slack_notifier = SlackNotifier()
+        message = (f":memo: *New Task Created*\n"
+                   f"Title: {task.title}\n"
+                   f"Team: {task.team.name}\n"
+                   f"Assigned To: {task.assigned_to.username if task.assigned_to else 'Not Assigned'}\n"
+                   f"Created By: {user.username}")
+        slack_notifier.send_message(message)
+
+    def update(self, request, *args, **kwargs):
+        instance = self.get_object()
+        old_status = instance.status  # Store old status before update
+
+        response = super().update(request, *args, **kwargs)
+
+        # Check if the status has changed
+        new_status = self.get_object().status
+        if old_status != new_status:
+            # Send Slack Notification when a task's status is updated
+            slack_notifier = SlackNotifier()
+            message = (f":bulb: *Task Status Updated*\n"
+                       f"Title: {instance.title}\n"
+                       f"Team: {instance.team.name}\n"
+                       f"Updated By: {request.user.username}\n"
+                       f"Old Status: {old_status} ➝ New Status: {new_status}")
+            slack_notifier.send_message(message)
+
+        return response
+
 
 class TriggerNotificationView(APIView):
     permission_classes = [permissions.IsAuthenticated]
