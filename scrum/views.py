@@ -30,6 +30,7 @@ class UserListCreateView(generics.CreateAPIView):
         email = serializer.validated_data.get('email')
         if User.objects.filter(email=email).exists():
             raise ValidationError({"email": ["A user with this email already exists."]})
+        
         is_first_user = not User.objects.exists()
         user = serializer.save()
         user.set_password(serializer.validated_data['password'])

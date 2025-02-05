@@ -15,3 +15,4 @@ class SlackNotifier:
         except SlackApiError as e:
             print(f"Error sending message to Slack: {e.response['error']}")
             return None
+ 
