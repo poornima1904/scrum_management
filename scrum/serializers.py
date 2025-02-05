@@ -34,6 +34,12 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ['id', 'username', 'email', 'password', 'role']
         # read_only_fields = ['role']  # Role cannot be modified directly
+    
+    def validate_email(self, value):
+        """ Ensure email is unique """
+        if User.objects.filter(email=value).exists():
+            raise serializers.ValidationError("A user with this email already exists.")
+        return value
 
     def create(self, validated_data):
         # Use the `set_password` method to hash the password

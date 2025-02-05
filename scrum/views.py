@@ -18,6 +18,7 @@ from .permissions import (
 )
 from .utils.slack import SlackNotifier
 from .utils.constants import ADMIN
+from rest_framework.exceptions import ValidationError
 
 # User Signup View
 class UserListCreateView(generics.CreateAPIView):
@@ -26,6 +27,9 @@ class UserListCreateView(generics.CreateAPIView):
     permission_classes = [permissions.AllowAny]  # Allow signup for all users
 
     def perform_create(self, serializer):
+        email = serializer.validated_data.get('email')
+        if User.objects.filter(email=email).exists():
+            raise ValidationError({"email": ["A user with this email already exists."]})
         is_first_user = not User.objects.exists()
         user = serializer.save()
         user.set_password(serializer.validated_data['password'])
@@ -87,7 +91,6 @@ class TeamMembershipListCreateView(generics.ListCreateAPIView):
     serializer_class = TeamMembershipSerializer
     permission_classes = [permissions.IsAuthenticated, IsScrumMasterOrAdminTeam]
 
-
 class TeamMembershipView(APIView):
 
     def post(self, request, *args, **kwargs):
@@ -105,9 +108,21 @@ class TeamMembershipView(APIView):
                 
                 # Create the team membership
                 team_membership = TeamMembership.objects.create(user=user, team=team, role=role)
-                
-            return Response({"message": f"User {user.username} added to team {team.name} with role {role}"},
-                            status=status.HTTP_201_CREATED)
+
+                # Trigger Slack notification
+                slack_notifier = SlackNotifier()
+                message = f"User {user.username} has been added to the team '{team.name}' with the role '{role}'."
+                slack_response = slack_notifier.send_message(message)
+
+                if slack_response:
+                    notification_status = "Notification sent to Slack successfully."
+                else:
+                    notification_status = "Failed to send notification to Slack."
+
+            return Response({
+                "message": f"User {user.username} added to team {team.name} with role {role}.",
+                "notification_status": notification_status
+            }, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
     
@@ -119,15 +134,33 @@ class TeamMembershipView(APIView):
             user = serializer.validated_data['user_id']
             team = serializer.validated_data['team_id']
             new_role = serializer.validated_data['role']
-            
-            # Update the role of the team member
-            team_membership = TeamMembership.objects.get(user=user, team=team)
-            team_membership.role = new_role
-            team_membership.save()
-            
-            return Response({"message": f"User role updated to {new_role}"}, status=status.HTTP_200_OK)
+
+            with transaction.atomic():  # Ensure role update is transactional
+                # Update the role of the team member
+                team_membership = TeamMembership.objects.get(user=user, team=team)
+                old_role = team_membership.role  # Store the old role for notification
+                team_membership.role = new_role
+                team_membership.save()
+
+                # Trigger Slack notification
+                slack_notifier = SlackNotifier()
+                message = (
+                    f"User {user.username}'s role in team '{team.name}' has been updated from '{old_role}' to '{new_role}'."
+                )
+                slack_response = slack_notifier.send_message(message)
+
+                if slack_response:
+                    notification_status = "Notification sent to Slack successfully."
+                else:
+                    notification_status = "Failed to send notification to Slack."
+
+            return Response({
+                "message": f"User {user.username}'s role updated to {new_role}.",
+                "notification_status": notification_status
+            }, status=status.HTTP_200_OK)
         
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 # Task List and Creation View
 class TaskViewSet(viewsets.ModelViewSet):
@@ -176,18 +209,34 @@ class TriggerNotificationView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def post(self, request):
+        team_id = request.data.get("team_id")
         user_id = request.data.get("user_id")
-        message = request.data.get("message", "No message provided.")
+        role = request.data.get("role", "Member")  # Default role is Member
 
-        # Fetch user details (optional)
+        # Fetch team and user details
         try:
+            team = Team.objects.get(id=team_id)
             user = User.objects.get(id=user_id)
-            user_info = f"User: {user.username} (ID: {user.id})"
+        except Team.DoesNotExist:
+            return Response({"error": f"Team with ID {team_id} does not exist."}, status=status.HTTP_400_BAD_REQUEST)
         except User.DoesNotExist:
-            user_info = f"User with ID {user_id} does not exist."
+            return Response({"error": f"User with ID {user_id} does not exist."}, status=status.HTTP_400_BAD_REQUEST)
 
-        # Send notification to the app
-        full_message = f"{message}\n{user_info}"
+        # Add user to the team
+        membership, created = TeamMembership.objects.get_or_create(user=user, team=team)
+        if not created:
+            return Response({"message": f"User {user.username} is already a member of the team {team.name}."}, status=status.HTTP_400_BAD_REQUEST)
+
+        membership.role = role
+        membership.save()
+
+        # Prepare notification message
+        full_message = (
+            f"A new user has been added to the team:\n"
+            f"Team: {team.name}\n"
+            f"User: {user.username} (ID: {user.id})\n"
+            f"Role: {role}"
+        )
         print(f"Notification triggered: {full_message}")
 
         # Send notification to Slack
@@ -195,9 +244,8 @@ class TriggerNotificationView(APIView):
         slack_response = slack_notifier.send_message(full_message)
 
         if slack_response:
-            return Response({"message": "Notification triggered and sent to Slack successfully."}, status=200)
-        return Response({"message": "Notification triggered but failed to send to Slack."}, status=500)
-
+            return Response({"message": "User added to the team and notification sent to Slack successfully."}, status=200)
+        return Response({"message": "User added to the team but failed to send notification to Slack."}, status=500)
 
 class TeamAPIView(APIView):
 
@@ -221,10 +269,30 @@ class TeamAPIView(APIView):
                 # Assign the creator as the team admin
                 TeamMembership.objects.create(user=user, team=team, role='admin')
 
-            return Response({"message": f"Team '{team.name}' created successfully."}, 
-                            status=status.HTTP_201_CREATED)
+                # Initialize Slack Notifier
+                slack_notifier = SlackNotifier()
+
+                # Generate notification message
+                if parent_team:
+                    message = f"A new sub-team '{team.name}' has been created under '{parent_team.name}' by {user.username}."
+                else:
+                    message = f"A new team '{team.name}' has been created by {user.username}."
+
+                # Send the notification to Slack
+                slack_response = slack_notifier.send_message(message)
+
+                if slack_response:
+                    notification_status = "Notification sent to Slack successfully."
+                else:
+                    notification_status = "Failed to send notification to Slack."
+
+            return Response({
+                "message": f"Team '{team.name}' created successfully.",
+                "notification_status": notification_status
+            }, status=status.HTTP_201_CREATED)
 
         return Response(serializer.errors, status=status.HTTP_400_BAD_REQUEST)
+
 
 
 class UserTeamsView(APIView):
