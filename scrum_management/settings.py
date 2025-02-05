@@ -13,7 +13,7 @@ SECRET_KEY = 'django-insecure-x^nr$4=e5m4tdi7ww7tx_x!+#j8ra91pwhc+xdw&-7jucoc*vg
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = []
+ALLOWED_HOSTS = ['0.0.0.0', 'localhost', '127.0.0.1','web']
 
 
 # Application definition
@@ -113,22 +113,22 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
 # settings.py
 
-# Celery Configuration
-# CELERY_BROKER_URL = 'redis://localhost:6379/0'
-# CELERY_ACCEPT_CONTENT = ['json']
-# CELERY_TASK_SERIALIZER = 'json'
+#Celery Configuration
+CELERY_BROKER_URL = 'redis://localhost:6379/0'
+CELERY_ACCEPT_CONTENT = ['json']
+CELERY_TASK_SERIALIZER = 'json'
 
 # # Django Channels Configuration
-# ASGI_APPLICATION = 'scrum_management.asgi.application'
-# CHANNEL_LAYERS = {
-#     'default': {
-#         'BACKEND': 'channels_redis.core.RedisChannelLayer',
-#         'CONFIG': {
-#             'hosts': [('127.0.0.1', 6379)],
-#         },
-#     },
-# }
+ASGI_APPLICATION = 'scrum_management.asgi.application'
+CHANNEL_LAYERS = {
+     'default': {
+         'BACKEND': 'channels_redis.core.RedisChannelLayer',
+         'CONFIG': {
+            'hosts': [('127.0.0.1', 6379)],
+        },
+   },
+ }
 
-# # Slack Integration
-# SLACK_BOT_TOKEN = 'xoxp-8342307234197-8338522187654-8339351878391-f68c50749db7f0131fa6c44f5f1e4227'
-# SLACK_DEFAULT_CHANNEL = "#scrum"
+# Slack Integration
+SLACK_BOT_TOKEN = 'xoxp-8342307234197-8338522187654-8421208564416-19283440b087bdf8a59dd3dd09815576'
+SLACK_DEFAULT_CHANNEL = "C08B2R45DUY"

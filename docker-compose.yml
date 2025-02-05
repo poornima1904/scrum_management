@@ -21,7 +21,7 @@ services:
       - DB_PORT=5432
 
   db:
-    image: postgres:14
+    image: postgres:13
     volumes:
       - postgres_data:/var/lib/postgresql/data
     environment:

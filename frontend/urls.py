@@ -9,5 +9,5 @@ urlpatterns = [
     path('signup/', views.SignupView.as_view(), name='signup'),
     path('dashboard/manage-teams/', views.ManageTeamsView.as_view(), name='manage_teams'),
     path('dashboard/manage-tasks/', views.ManageTasksView.as_view(), name='manage_tasks'),
-       path('dashboard/manage-memberships/', views.ManageTeamMembershipsView.as_view(), name='manage_team_memberships'),
+    path('dashboard/manage-memberships/', views.ManageTeamMembershipsView.as_view(), name='manage_team_memberships'),
 ]
