@@ -151,16 +151,17 @@ class TaskSerializer(serializers.ModelSerializer):
         # Validate that the assigned user exists
         if value and not User.objects.filter(id=value.id).exists():
             raise serializers.ValidationError("Assigned user does not exist.")
+        return value
 
     def validate(self, attrs):
         assigned_to = attrs.get('assigned_to')
-        assigned_team_task =  attrs.get('team')
+        assigned_team_task_id =  attrs.get('team').id
         user_teams = TeamMembership.objects.filter(user_id=assigned_to).values_list("team_id", flat=True)
         # Custom validation for any other business logic
         if assigned_to and attrs.get('created_by') ==assigned_to:
             raise serializers.ValidationError("Assigned user cannot be the same as the creator.")
          # ensure the user is from the same team
-        if assigned_team_task not in user_teams:
+        if assigned_team_task_id not in user_teams:
             raise serializers.ValidationError("Cannot assign task of some other team")
         return attrs
 
